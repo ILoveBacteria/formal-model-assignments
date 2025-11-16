@@ -103,18 +103,9 @@ proctype groundStation() {
                 printf("[groundStation] Received message from satellite 3: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload);
                 state = 3;
             fi
-        :: state == 1 -> if 
-            :: grant_ground1 ? _ -> count_received_messages[0]++; printf("[groundStation] Grant for satellite 1, count=%d\n", count_received_messages[0]); state = 0; to_ground1 ! ack_message; printf("[groundStation] Sent ACK to satellite 1\n");
-            :: true -> skip;
-            fi
-        :: state == 2 -> if 
-            :: grant_ground2 ? _ -> count_received_messages[1]++; printf("[groundStation] Grant for satellite 2, count=%d\n", count_received_messages[1]); state = 0; to_ground2 ! ack_message; printf("[groundStation] Sent ACK to satellite 2\n");
-            :: true -> skip;
-            fi
-        :: state == 3 -> if 
-            :: grant_ground3 ? _ -> count_received_messages[2]++; printf("[groundStation] Grant for satellite 3, count=%d\n", count_received_messages[2]); state = 0; to_ground3 ! ack_message; printf("[groundStation] Sent ACK to satellite 3\n");
-            :: true -> skip;
-            fi
+        :: state == 1 && len(grant_ground1) > 0 -> grant_ground1 ? _; count_received_messages[0]++; printf("[groundStation] Grant for satellite 1, count=%d\n", count_received_messages[0]); state = 0; to_ground1 ! ack_message; printf("[groundStation] Sent ACK to satellite 1\n");
+        :: state == 2 && len(grant_ground2) > 0 -> grant_ground2 ? _; count_received_messages[1]++; printf("[groundStation] Grant for satellite 2, count=%d\n", count_received_messages[1]); state = 0; to_ground2 ! ack_message; printf("[groundStation] Sent ACK to satellite 2\n");
+        :: state == 3 && len(grant_ground3) > 0 -> grant_ground3 ? _; count_received_messages[2]++; printf("[groundStation] Grant for satellite 3, count=%d\n", count_received_messages[2]); state = 0; to_ground3 ! ack_message; printf("[groundStation] Sent ACK to satellite 3\n");
         od
     }
 }
@@ -170,19 +161,16 @@ proctype satellite1(chan buffer) {
         :: state == 4 -> if
             :: time_out[0] ? _ -> printf("[satellite1] TIMEOUT waiting for ground ACK\n"); state = 3;
             :: to_ground1 ? ack -> timer_off[0] ! 1; printf("[satellite1] Received ACK from ground\n"); state = 7;
-            :: true -> skip;
             fi
         // Wait for ack from satellite 2
         :: state == 5 -> if
             :: time_out[0] ? _ -> printf("[satellite1] TIMEOUT waiting for sat2 ACK\n"); state = 3;
             :: isl12 ? ack -> timer_off[0] ! 1; printf("[satellite1] Received ACK from sat2\n"); state = 7;
-            :: true -> skip;
             fi
         // Wait for ack from satellite 3
         :: state == 6 -> if
             :: time_out[0] ? _ -> printf("[satellite1] TIMEOUT waiting for sat3 ACK\n"); state = 3;
             :: isl13 ? ack -> timer_off[0] ! 1; printf("[satellite1] Received ACK from sat3\n"); state = 7;
-            :: true -> skip;
             fi
         // ack received
         :: state == 7 -> if 
