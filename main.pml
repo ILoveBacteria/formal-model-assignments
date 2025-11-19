@@ -36,13 +36,16 @@ chan time_out[3] = [0] of { bit }
 
 proctype timeKeeper() {
     byte current_slot = 0;
+    byte timer = 0;
     do
-    :: true -> if
+    :: timer >= 7 -> if
         :: current_slot < 7 -> current_slot = current_slot + 1;
         :: current_slot >= 7 -> current_slot = 0;
         fi
         printf("[timeKeeper] current_slot = %d\n", current_slot);
         slot_signal ! current_slot;
+        timer = 0;
+    :: else -> timer++;
     od
 }
 
@@ -314,6 +317,6 @@ init {
     run coordinator();
     run satellite1(satellite1_buffer);
     run satellite2(satellite2_buffer);
-    // run satellite3(satellite3_buffer);
+    run satellite3(satellite3_buffer);
     run groundStation();
 }
