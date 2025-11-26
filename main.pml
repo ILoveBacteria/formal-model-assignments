@@ -226,156 +226,152 @@ proctype satellite1(chan buffer) {
 }
 
 proctype satellite2(chan buffer) {
-    byte battery = 100;
     bool safe_mode = false;
     Message msg;
     Message ack;
-    int state = 0;
     run timer(1);
     do
-    // charge battery
+    // charge battery2
     :: len(slot_changed2) > 0 -> slot_changed2 ? _; if
-        :: battery + 8 >= 100 -> battery = 100;
-        :: else -> battery = battery + 8;
+        :: battery2 + 8 >= 100 -> battery2 = 100;
+        :: else -> battery2 = battery2 + 8;
         fi;
-        printf("[satellite2] Battery=%d\n", battery); if
-        :: battery > 20 -> safe_mode = false; printf("[satellite2] Safe mode off\n");
+        printf("[satellite2] battery2=%d\n", battery2); if
+        :: battery2 > 20 -> safe_mode = false; printf("[satellite2] Safe mode off\n");
         :: else -> skip;
         fi
     // Receive or send message (idle)
-    :: state == 0 -> if
-        :: battery >= 6 -> if
-            :: isl12 ? msg -> battery = battery - 5; if
-                :: len(buffer) < BUFFER_SIZE -> printf("[satellite2] Received from isl12: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 1;
+    :: state2 == 0 -> if
+        :: battery2 >= 6 -> if
+            :: isl12 ? msg -> battery2 = battery2 - 5; if
+                :: len(buffer) < BUFFER_SIZE -> printf("[satellite2] Received from isl12: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state2 = 1;
                 :: else -> printf("[satellite2] Dropped from isl12: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload);
                 fi
             :: true -> skip;
             fi
-        :: battery >= 6 -> if
-            :: isl23 ? msg -> battery = battery - 5; if
-                :: len(buffer) < BUFFER_SIZE -> printf("[satellite2] Received from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 2;
+        :: battery2 >= 6 -> if
+            :: isl23 ? msg -> battery2 = battery2 - 5; if
+                :: len(buffer) < BUFFER_SIZE -> printf("[satellite2] Received from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state2 = 2;
                 :: else -> printf("[satellite2] Dropped from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload);
                 fi
             :: true -> skip;
             fi
-        :: battery >= 10 && len(buffer) > 0 -> buffer ? msg; printf("[satellite2] Buffer pop: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 3;
+        :: battery2 >= 10 && len(buffer) > 0 -> buffer ? msg; printf("[satellite2] Buffer pop: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state2 = 3;
         :: else -> skip;
         fi
     // send ack to satellite 1
-    :: state == 1 && len(grant_isl12) > 0 ->
-        grant_isl12 ? _; buffer ! msg; printf("[satellite2] Grant isl12, ack sent\n"); state = 8; isl12 ! ack_message; battery--;
+    :: state2 == 1 && len(grant_isl12) > 0 ->
+        grant_isl12 ? _; buffer ! msg; printf("[satellite2] Grant isl12, ack sent\n"); state2 = 8; isl12 ! ack_message; battery2--;
     // send ack to satellite 3
-    :: state == 2 && len(grant_isl23) > 0 ->
-        grant_isl23 ? _; buffer ! msg; printf("[satellite2] Grant isl23, ack sent\n"); state = 8; isl23 ! ack_message; battery--;
+    :: state2 == 2 && len(grant_isl23) > 0 ->
+        grant_isl23 ? _; buffer ! msg; printf("[satellite2] Grant isl23, ack sent\n"); state2 = 8; isl23 ! ack_message; battery2--;
     // Wait for grant and send
-    :: state == 3 -> if
-        :: msg.dest == 0 && len(grant_ground2) > 0 && battery >= 20 -> grant_ground2 ? _; printf("[satellite2] Grant ground2, sending to ground\n"); state = 4; to_ground2 ! msg; timer_on[1] ! 1; battery = battery - 15;
-        :: msg.dest == 1 && len(grant_isl12) > 0 && battery >= 20 -> grant_isl12 ? _; printf("[satellite2] Grant isl12, sending to sat1\n"); state = 5; isl12 ! msg; timer_on[1] ! 1; battery = battery - 10;
-        :: msg.dest == 2 -> printf("[satellite2] Message for self, drop\n"); state = 0;
-        :: msg.dest == 3 && len(grant_isl23) > 0 && battery >= 20 -> grant_isl23 ? _; printf("[satellite2] Grant isl23, sending to sat3\n"); state = 6; isl23 ! msg; timer_on[1] ! 1; battery = battery - 10;
-        :: else -> buffer ! msg; printf("[satellite2] No grant, re-buffer\n"); state = 0;
+    :: state2 == 3 -> if
+        :: msg.dest == 0 && len(grant_ground2) > 0 && battery2 >= 20 -> grant_ground2 ? _; printf("[satellite2] Grant ground2, sending to ground\n"); state2 = 4; to_ground2 ! msg; timer_on[1] ! 1; battery2 = battery2 - 15;
+        :: msg.dest == 1 && len(grant_isl12) > 0 && battery2 >= 20 -> grant_isl12 ? _; printf("[satellite2] Grant isl12, sending to sat1\n"); state2 = 5; isl12 ! msg; timer_on[1] ! 1; battery2 = battery2 - 10;
+        :: msg.dest == 2 -> printf("[satellite2] Message for self, drop\n"); state2 = 0;
+        :: msg.dest == 3 && len(grant_isl23) > 0 && battery2 >= 20 -> grant_isl23 ? _; printf("[satellite2] Grant isl23, sending to sat3\n"); state2 = 6; isl23 ! msg; timer_on[1] ! 1; battery2 = battery2 - 10;
+        :: else -> buffer ! msg; printf("[satellite2] No grant, re-buffer\n"); state2 = 0;
         fi
     // Wait for ack from ground station
-    :: state == 4 -> if
-        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for ground ACK\n"); state = 3;
-        :: to_ground2 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from ground\n"); state = 7; battery--;
+    :: state2 == 4 -> if
+        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for ground ACK\n"); state2 = 3;
+        :: to_ground2 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from ground\n"); state2 = 7; battery2--;
         fi
     // Wait for ack from satellite 1
-    :: state == 5 -> if
-        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for sat1 ACK\n"); state = 3;
-        :: isl12 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from sat1\n"); state = 7; battery--;
+    :: state2 == 5 -> if
+        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for sat1 ACK\n"); state2 = 3;
+        :: isl12 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from sat1\n"); state2 = 7; battery2--;
         fi
     // Wait for ack from satellite 3
-    :: state == 6 -> if
-        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for sat3 ACK\n"); state = 3;
-        :: isl23 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from sat3\n"); state = 7; battery--;
+    :: state2 == 6 -> if
+        :: time_out[1] ? _ -> printf("[satellite2] TIMEOUT waiting for sat3 ACK\n"); state2 = 3;
+        :: isl23 ? ack -> timer_off[1] ! 1; printf("[satellite2] Received ACK from sat3\n"); state2 = 7; battery2--;
         fi
     // ack received
-    :: state == 7 -> if 
-        :: ack.type == ACK -> printf("[satellite2] ACK received, back to idle\n"); state = 8;
-        :: else -> printf("[satellite2] Not ACK, retry\n"); state = 3;
+    :: state2 == 7 -> if
+        :: ack.type == ACK -> printf("[satellite2] ACK received, back to idle\n"); state2 = 8;
+        :: else -> printf("[satellite2] Not ACK, retry\n"); state2 = 3;
         fi
-    // battery check
-    :: state == 8 -> if
-        :: battery < 10 -> safe_mode = true; printf("[satellite2] Safe mode on\n");
+    // battery2 check
+    :: state2 == 8 -> if
+        :: battery2 < 10 -> safe_mode = true; printf("[satellite2] Safe mode on\n");
         :: else -> skip
         fi
     od
 }
 
 proctype satellite3(chan buffer) {
-    byte battery = 100;
     bool safe_mode = false;
     Message msg;
     Message ack;
-    int state = 0;
     run timer(2);
     do
-    // charge battery
+    // charge battery3
     :: len(slot_changed3) > 0 -> slot_changed3 ? _; if
-        :: battery + 8 >= 100 -> battery = 100;
-        :: else -> battery = battery + 8;
+        :: battery3 + 8 >= 100 -> battery3 = 100;
+        :: else -> battery3 = battery3 + 8;
         fi;
-        printf("[satellite3] Battery=%d\n", battery); if
-        :: battery > 20 -> safe_mode = false; printf("[satellite3] Safe mode off\n");
+        printf("[satellite3] battery3=%d\n", battery3); if
+        :: battery3 > 20 -> safe_mode = false; printf("[satellite3] Safe mode off\n");
         :: else -> skip;
         fi
     // Receive or send message (idle)
-    :: state == 0 -> if
-        :: battery >= 6 -> if
-            :: isl13 ? msg -> battery = battery - 5; if
-                :: len(buffer) < BUFFER_SIZE -> printf("[satellite3] Received from isl13: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 1;
+    :: state3 == 0 -> if
+        :: battery3 >= 6 -> if
+            :: isl13 ? msg -> battery3 = battery3 - 5; if
+                :: len(buffer) < BUFFER_SIZE -> printf("[satellite3] Received from isl13: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state3 = 1;
                 :: else -> printf("[satellite3] Dropped from isl13: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload);
                 fi
             :: true -> skip;
             fi
-        :: battery >= 6 -> if
-            :: isl23 ? msg -> battery = battery - 5; if
-                :: len(buffer) < BUFFER_SIZE -> printf("[satellite3] Received from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 2;
+        :: battery3 >= 6 -> if
+            :: isl23 ? msg -> battery3 = battery3 - 5; if
+                :: len(buffer) < BUFFER_SIZE -> printf("[satellite3] Received from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state3 = 2;
                 :: else -> printf("[satellite3] Dropped from isl23: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload);
                 fi
             :: true -> skip;
             fi
-        :: battery >= 10 && len(buffer) > 0 -> buffer ? msg; printf("[satellite3] Buffer pop: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state = 3;
+        :: battery3 >= 10 && len(buffer) > 0 -> buffer ? msg; printf("[satellite3] Buffer pop: type=%d, src=%d, dest=%d, payload=%d\n", msg.type, msg.src, msg.dest, msg.payload); state3 = 3;
         :: else -> skip;
         fi
     // send ack to satellite 1
-    :: state == 1 && len(grant_isl13) > 0 ->
-        grant_isl13 ? _; buffer ! msg; printf("[satellite3] Grant isl13, ack sent\n"); state = 8; isl13 ! ack_message; battery--;
+    :: state3 == 1 && len(grant_isl13) > 0 ->
+        grant_isl13 ? _; buffer ! msg; printf("[satellite3] Grant isl13, ack sent\n"); state3 = 8; isl13 ! ack_message; battery3--;
     // send ack to satellite 2
-    :: state == 2 && len(grant_isl23) > 0 ->
-        grant_isl23 ? _; buffer ! msg; printf("[satellite3] Grant isl23, ack sent\n"); state = 8; isl23 ! ack_message; battery--;
+    :: state3 == 2 && len(grant_isl23) > 0 ->
+        grant_isl23 ? _; buffer ! msg; printf("[satellite3] Grant isl23, ack sent\n"); state3 = 8; isl23 ! ack_message; battery3--;
     // Wait for grant and send
-    :: state == 3 -> if
-        :: msg.dest == 0 && len(grant_ground3) > 0 && battery >= 20 -> grant_ground3 ? _; printf("[satellite3] Grant ground3, sending to ground\n"); state = 4; to_ground3 ! msg; timer_on[2] ! 1; battery = battery - 15;
-        :: msg.dest == 1 && len(grant_isl13) > 0 && battery >= 20 -> grant_isl13 ? _; printf("[satellite3] Grant isl13, sending to sat1\n"); state = 5; isl13 ! msg; timer_on[2] ! 1; battery = battery - 10;
-        :: msg.dest == 2 && len(grant_isl23) > 0 && battery >= 20 -> grant_isl23 ? _; printf("[satellite3] Grant isl23, sending to sat2\n"); state = 6; isl23 ! msg; timer_on[2] ! 1; battery = battery - 10;
-        :: msg.dest == 3 -> printf("[satellite3] Message for self, drop\n"); state = 0;
-        :: else -> buffer ! msg; printf("[satellite3] No grant, re-buffer\n"); state = 0;
+    :: state3 == 3 -> if
+        :: msg.dest == 0 && len(grant_ground3) > 0 && battery3 >= 20 -> grant_ground3 ? _; printf("[satellite3] Grant ground3, sending to ground\n"); state3 = 4; to_ground3 ! msg; timer_on[2] ! 1; battery3 = battery3 - 15;
+        :: msg.dest == 1 && len(grant_isl13) > 0 && battery3 >= 20 -> grant_isl13 ? _; printf("[satellite3] Grant isl13, sending to sat1\n"); state3 = 5; isl13 ! msg; timer_on[2] ! 1; battery3 = battery3 - 10;
+        :: msg.dest == 2 && len(grant_isl23) > 0 && battery3 >= 20 -> grant_isl23 ? _; printf("[satellite3] Grant isl23, sending to sat2\n"); state3 = 6; isl23 ! msg; timer_on[2] ! 1; battery3 = battery3 - 10;
+        :: msg.dest == 3 -> printf("[satellite3] Message for self, drop\n"); state3 = 0;
+        :: else -> buffer ! msg; printf("[satellite3] No grant, re-buffer\n"); state3 = 0;
         fi
     // Wait for ack from ground station
-    :: state == 4 -> if
-        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for ground ACK\n"); state = 3;
-        :: to_ground3 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from ground\n"); state = 7;
+    :: state3 == 4 -> if
+        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for ground ACK\n"); state3 = 3;
+        :: to_ground3 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from ground\n"); state3 = 7;
         fi
     // Wait for ack from satellite 1
-    :: state == 5 -> if
-        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for sat1 ACK\n"); state = 3;
-        :: isl13 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from sat1\n"); state = 7;
+    :: state3 == 5 -> if
+        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for sat1 ACK\n"); state3 = 3;
+        :: isl13 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from sat1\n"); state3 = 7;
         fi
     // Wait for ack from satellite 2
-    :: state == 6 -> if
-        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for sat2 ACK\n"); state = 3;
-        :: isl23 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from sat2\n"); state = 7;
+    :: state3 == 6 -> if
+        :: time_out[2] ? _ -> printf("[satellite3] TIMEOUT waiting for sat2 ACK\n"); state3 = 3;
+        :: isl23 ? ack -> timer_off[2] ! 1; printf("[satellite3] Received ACK from sat2\n"); state3 = 7;
         fi
     // ack received
-    :: state == 7 -> if 
-        :: ack.type == ACK -> printf("[satellite3] ACK received, back to idle\n"); state = 0;
-        :: else -> printf("[satellite3] Not ACK, retry\n"); state = 3;
+    :: state3 == 7 -> if 
+        :: ack.type == ACK -> printf("[satellite3] ACK received, back to idle\n"); state3 = 8;
+        :: else -> printf("[satellite3] Not ACK, retry\n"); state3 = 3;
         fi
-    // battery check
-    :: state == 8 -> if
-        :: battery < 10 -> safe_mode = true; printf("[satellite3] Safe mode on\n");
+    // battery3 check
+    :: state3 == 8 -> if
+        :: battery3 < 10 -> safe_mode = true; printf("[satellite3] Safe mode on\n");
         :: else -> skip
         fi
     od
