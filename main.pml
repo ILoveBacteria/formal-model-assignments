@@ -402,6 +402,13 @@ init {
     satellite2_buffer ! sample2;
     satellite2_buffer ! sample2;
     satellite2_buffer ! sample2;
+    // fill satellite 3 buffer
+    Message sample3;
+    sample3.type = TELEMETRY;
+    sample3.src = 3;
+    sample3.dest = 1;
+    sample3.payload = 0;
+    satellite3_buffer ! sample3;
     // run processes
     run timeKeeper();
     run coordinator();
@@ -416,11 +423,7 @@ ltl no_send_low_battery1 { [] !(((state1 == 4) && (battery1 < 5)) || ((state1 ==
 ltl no_send_low_battery2 { [] !(((state2 == 4) && (battery2 < 5)) || ((state2 == 5 || state2 == 6) && (battery2 < 10))) }
 ltl no_send_low_battery3 { [] !(((state3 == 4) && (battery3 < 5)) || ((state3 == 5 || state3 == 6) && (battery3 < 10))) }
 ltl no_overflow { [] (len(satellite1_buffer) <= 5 && len(satellite2_buffer) <= 5 && len(satellite3_buffer) <= 5) }
-ltl eventual_processing {
-    [] ((len(satellite1_buffer) > 0 -> <> len(satellite1_buffer) == 0) &&
-        (len(satellite2_buffer) > 0 -> <> len(satellite2_buffer) == 0) &&
-        (len(satellite3_buffer) > 0 -> <> len(satellite3_buffer) == 0))
-}
+ltl eventual_processing { [] <> ((len(satellite1_buffer) == 0 && len(satellite2_buffer) == 0 && len(satellite3_buffer) == 0)) }
 ltl eventual_access_ground {
     [] ((len(grant_ground1) == 0 -> <> len(grant_ground1) > 0) &&
         (len(grant_ground2) == 0 -> <> len(grant_ground2) > 0) &&
